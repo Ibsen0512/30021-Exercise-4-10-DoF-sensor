@@ -1,4 +1,5 @@
-#include <LSM9DS1.h>
+#include "30010_io.h"
+#include "LSM9DS1.h"
 
 void init_SPI3_9DOF(){
 	 GPIO_InitTypeDef GPIO_InitStructAll;
@@ -8,6 +9,7 @@ void init_SPI3_9DOF(){
 	 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
 	 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 	 RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI3, ENABLE);
+	 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOD, ENABLE);
 
 	 //init SPI related pins
 	 //PC10 - SCLK
@@ -37,6 +39,8 @@ void init_SPI3_9DOF(){
 	 SPI_InitStructAll.SPI_FirstBit = SPI_FirstBit_MSB;
 	 SPI_InitStructAll.SPI_CRCPolynomial = 7;
 	 SPI_Init(SPI3, &SPI_InitStructAll);
+     // Set RX FIFO threshold to 8-bit
+     SPI_RxFIFOThresholdConfig(SPI3, SPI_RxFIFOThreshold_QF);    
 	 SPI_Cmd(SPI3, ENABLE);
 
 	 //init CS_ pins
@@ -62,13 +66,44 @@ void init_SPI3_9DOF(){
 	 GPIO_SetBits(GPIOC, GPIO_Pin_8); // CS = 1
 }
 
+/*
+uint8_t SPI3_read_byte(uint8_t data, uint8_t selector)
+{
+    uint8_t dummy;
+    uint8_t output;
+
+    if (selector == GyroAccTemp_SEL)
+    {GPIO_ResetBits(GPIOD, GPIO_Pin_2);}
+    else if (selector == Magnetometer_SEL)
+    {GPIO_ResetBits(GPIOC, GPIO_Pin_8);}
+    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
+    SPI_SendData8(SPI3, data);
+    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}
+    dummy = SPI_ReceiveData8(SPI3);
+    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
+    SPI_SendData8(SPI3, 0x00);
+    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}
+    output = SPI_ReceiveData8(SPI3);
+    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_BSY) == SET){}
+    if (selector == GyroAccTemp_SEL)
+    {GPIO_SetBits(GPIOD, GPIO_Pin_2);}
+    else if (selector == Magnetometer_SEL)
+    {GPIO_SetBits(GPIOC, GPIO_Pin_8);}
+
+    return output;
+}
+    */
+
 uint8_t SPI3_read_byte(uint8_t data, uint8_t selector){
-	int output;
+    int output;
+    uint8_t dummy;
 	switch (selector){
 		case 0: //Gyro and accelerometer with CS bound to PD2
 			GPIO_ResetBits(GPIOD, GPIO_Pin_2); // CS = 0 - Start Transmission
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, data);
+            while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}
+            dummy = SPI_ReceiveData8(SPI3);
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, 0x00); //Dummy data to keep clock running for read action
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET) {}
@@ -80,11 +115,12 @@ uint8_t SPI3_read_byte(uint8_t data, uint8_t selector){
 
 		case 1: //Magnetometer with CS bound to PC8
 			GPIO_ResetBits(GPIOC, GPIO_Pin_8); // CS = 0 - Start Transmission
-			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
+			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET) {}
+            while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, data);
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, 0x00); //Dummy data to keep clock running for read action
-			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET) {}
+
 			output = SPI_ReceiveData8(SPI3);
 			while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
 			while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_BSY) == SET){}
@@ -124,7 +160,7 @@ void readTempData(int16_t *out_temp){
 
 }
 
-void readMagnetometorData(int16_t *out_x, int16_t *out_y, int16_t *out_z){
+void readMagData(int16_t *out_x, int16_t *out_y, int16_t *out_z){
 	*out_x = SPI3_read_byte(READ | 0x29, Magnetometer_SEL)<<8;
 	*out_x |= SPI3_read_byte(READ | 0x28, Magnetometer_SEL);
 
@@ -134,5 +170,3 @@ void readMagnetometorData(int16_t *out_x, int16_t *out_y, int16_t *out_z){
 	*out_z = SPI3_read_byte(READ | 0x2D, Magnetometer_SEL)<<8;
 	*out_z |= SPI3_read_byte(READ | 0x2C, Magnetometer_SEL);
 }
-
-
