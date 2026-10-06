@@ -66,39 +66,12 @@ void init_SPI3_9DOF(){
 	 GPIO_SetBits(GPIOC, GPIO_Pin_8); // CS = 1
 }
 
-/*
-uint8_t SPI3_read_byte(uint8_t data, uint8_t selector)
-{
-    uint8_t dummy;
-    uint8_t output;
-
-    if (selector == GyroAccTemp_SEL)
-    {GPIO_ResetBits(GPIOD, GPIO_Pin_2);}
-    else if (selector == Magnetometer_SEL)
-    {GPIO_ResetBits(GPIOC, GPIO_Pin_8);}
-    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
-    SPI_SendData8(SPI3, data);
-    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}
-    dummy = SPI_ReceiveData8(SPI3);
-    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
-    SPI_SendData8(SPI3, 0x00);
-    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}
-    output = SPI_ReceiveData8(SPI3);
-    while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_BSY) == SET){}
-    if (selector == GyroAccTemp_SEL)
-    {GPIO_SetBits(GPIOD, GPIO_Pin_2);}
-    else if (selector == Magnetometer_SEL)
-    {GPIO_SetBits(GPIOC, GPIO_Pin_8);}
-
-    return output;
-}
-    */
-
 uint8_t SPI3_read_byte(uint8_t data, uint8_t selector){
     int output;
     uint8_t dummy;
 	switch (selector){
 		case 0: //Gyro and accelerometer with CS bound to PD2
+			GPIO_SetBits(GPIOC, GPIO_Pin_8);       // Make sure Magnetometer is deselected
 			GPIO_ResetBits(GPIOD, GPIO_Pin_2); // CS = 0 - Start Transmission
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, data);
@@ -114,13 +87,15 @@ uint8_t SPI3_read_byte(uint8_t data, uint8_t selector){
 			break;
 
 		case 1: //Magnetometer with CS bound to PC8
+			GPIO_SetBits(GPIOD, GPIO_Pin_2);       // Make sure Gyro/Acc is deselected
 			GPIO_ResetBits(GPIOC, GPIO_Pin_8); // CS = 0 - Start Transmission
-			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET) {}
-            while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
-			SPI_SendData8(SPI3, data);
+			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
+    		SPI_SendData8(SPI3, data);
+            while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET) { }
+			dummy = SPI_ReceiveData8(SPI3);
 			while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) != SET) { }
 			SPI_SendData8(SPI3, 0x00); //Dummy data to keep clock running for read action
-
+			while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_RXNE) == RESET){}			
 			output = SPI_ReceiveData8(SPI3);
 			while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET){}
 			while (SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_BSY) == SET){}
