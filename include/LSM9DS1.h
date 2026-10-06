@@ -14,6 +14,6 @@ uint8_t SPI3_read_byte(uint8_t data, uint8_t selector);
 void readGyroData(int16_t *out_x, int16_t *out_y, int16_t *out_z);
 void readAccData(int16_t *out_x, int16_t *out_y, int16_t *out_z);
 void readTempData(int16_t *out_temp);
-void readMagnetometorData(int16_t *out_x, int16_t *out_y, int16_t *out_z);
+void readMagData(int16_t *out_x, int16_t *out_y, int16_t *out_z);
 
 #endif /* LSM9DS1_H_ */
